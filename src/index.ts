@@ -2,7 +2,11 @@ import * as core from "@actions/core";
 
 import { loadConfig } from "./config";
 import { getFailOnCritical } from "./inputs";
-import { resolveSentinelCli, runScan } from "./run-scan";
+import {
+  resolveSentinelCli,
+  runScan,
+  DEFAULT_SENTINEL_VERSION,
+} from "./run-scan";
 import { mapSeverity, shouldAlert } from "./severity";
 import { sendSlackAlert } from "./alerts/slack";
 import { sendDiscordAlert } from "./alerts/discord";
@@ -15,6 +19,8 @@ async function run(): Promise<void> {
   try {
     // 1. Read inputs
     const sentinelCliPath = core.getInput("sentinel-cli-path") || "install";
+    const sentinelVersion =
+      core.getInput("sentinel-version") || DEFAULT_SENTINEL_VERSION;
     const configPath = core.getInput("config-path") || "contracts.yml";
     const rpcUrl = core.getInput("rpc-url", { required: true });
     const slackWebhookUrl = core.getInput("slack-webhook-url");
@@ -40,7 +46,10 @@ async function run(): Promise<void> {
     core.info(`Loaded ${config.contracts.length} contract(s) from config`);
 
     // 3. Resolve sentinel CLI
-    const sentinelPath = await resolveSentinelCli(sentinelCliPath);
+    const sentinelPath = await resolveSentinelCli(
+      sentinelCliPath,
+      sentinelVersion
+    );
     core.info(`Sentinel CLI: ${sentinelPath}`);
 
     // 4. Run scan against all contracts

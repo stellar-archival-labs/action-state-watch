@@ -34736,6 +34736,7 @@ async function run() {
     try {
         // 1. Read inputs
         const sentinelCliPath = core.getInput("sentinel-cli-path") || "install";
+        const sentinelVersion = core.getInput("sentinel-version") || run_scan_1.DEFAULT_SENTINEL_VERSION;
         const configPath = core.getInput("config-path") || "contracts.yml";
         const rpcUrl = core.getInput("rpc-url", { required: true });
         const slackWebhookUrl = core.getInput("slack-webhook-url");
@@ -34755,7 +34756,7 @@ async function run() {
         const config = (0, config_1.loadConfig)(configPath);
         core.info(`Loaded ${config.contracts.length} contract(s) from config`);
         // 3. Resolve sentinel CLI
-        const sentinelPath = await (0, run_scan_1.resolveSentinelCli)(sentinelCliPath);
+        const sentinelPath = await (0, run_scan_1.resolveSentinelCli)(sentinelCliPath, sentinelVersion);
         core.info(`Sentinel CLI: ${sentinelPath}`);
         // 4. Run scan against all contracts
         core.info("Starting contract scans...");
@@ -34955,23 +34956,161 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.DEFAULT_SENTINEL_VERSION = void 0;
+exports.platformTarget = platformTarget;
+exports.findOnPath = findOnPath;
+exports.verifyChecksum = verifyChecksum;
+exports.installViaCargo = installViaCargo;
+exports.installSentinelCli = installSentinelCli;
 exports.resolveSentinelCli = resolveSentinelCli;
 exports.runScan = runScan;
 const core = __importStar(__nccwpck_require__(7484));
 const child_process_1 = __nccwpck_require__(5317);
+const crypto = __importStar(__nccwpck_require__(6982));
 const fs = __importStar(__nccwpck_require__(9896));
 const os = __importStar(__nccwpck_require__(857));
 const path = __importStar(__nccwpck_require__(6928));
 /** Sentinel CLI binary name, pinned. */
 const SENTINEL_BINARY = "soroban-state-sentinel";
+/** GitHub org that publishes the sentinel release binaries. */
+const SENTINEL_OWNER = "stellar-archival-labs";
+/** GitHub repository that publishes the sentinel release binaries. */
+const SENTINEL_REPO = "soroban-state-sentinel";
+/**
+ * Release tag installed by default. This is the version this action is
+ * developed and tested against; override it with the `sentinel-version` input.
+ */
+exports.DEFAULT_SENTINEL_VERSION = "v0.1.0";
+/**
+ * Map a runner platform/arch onto a published release target triple.
+ * Returns `null` when no prebuilt asset exists for that platform, which
+ * triggers the `cargo install` fallback.
+ */
+function platformTarget(platform = process.platform, arch = process.arch) {
+    if (platform === "linux" && arch === "x64")
+        return "x86_64-unknown-linux-gnu";
+    if (platform === "darwin" && arch === "arm64")
+        return "aarch64-apple-darwin";
+    if (platform === "darwin" && arch === "x64")
+        return "x86_64-apple-darwin";
+    return null;
+}
+/**
+ * Locate `soroban-state-sentinel` on PATH without invoking a shell.
+ * Returns the absolute path to the first match, or `null`.
+ */
+function findOnPath(binary = SENTINEL_BINARY) {
+    const exts = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
+    const dirs = (process.env.PATH ?? "")
+        .split(path.delimiter)
+        .filter((d) => d.length > 0);
+    for (const dir of dirs) {
+        for (const ext of exts) {
+            const candidate = path.join(dir, binary + ext);
+            try {
+                if (fs.existsSync(candidate))
+                    return candidate;
+            }
+            catch {
+                // Ignore unreadable PATH entries.
+            }
+        }
+    }
+    return null;
+}
+/**
+ * Verify a downloaded file against its published `.sha256` sidecar.
+ * The sidecar is the standard `<hex>  <filename>` format; only the leading
+ * hex digest is compared.
+ */
+function verifyChecksum(filePath, shaFilePath) {
+    const expected = fs
+        .readFileSync(shaFilePath, "utf8")
+        .trim()
+        .split(/\s+/)[0]
+        ?.toLowerCase();
+    if (!expected)
+        return false;
+    const actual = crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(filePath))
+        .digest("hex");
+    return actual === expected;
+}
+/** Download `url` to `dest` using curl with an argument array (no shell). */
+function download(url, dest) {
+    (0, child_process_1.execFileSync)("curl", ["-fsSL", "-o", dest, url], { stdio: "inherit" });
+}
+/**
+ * Fallback: build and install the CLI straight from the released git tag.
+ * Used only when there is no prebuilt asset for this platform.
+ */
+function installViaCargo(version) {
+    core.info(`No prebuilt asset for ${process.platform}/${process.arch}; ` +
+        `falling back to: cargo install --git https://github.com/${SENTINEL_OWNER}/${SENTINEL_REPO} --tag ${version} sentinel-cli --locked`);
+    (0, child_process_1.execFileSync)("cargo", [
+        "install",
+        "--git", `https://github.com/${SENTINEL_OWNER}/${SENTINEL_REPO}`,
+        "--tag", version,
+        "sentinel-cli",
+        "--locked",
+    ], { stdio: "inherit" });
+    const cargoBin = path.join(os.homedir(), ".cargo", "bin", SENTINEL_BINARY);
+    if (fs.existsSync(cargoBin))
+        return cargoBin;
+    const onPath = findOnPath();
+    if (onPath)
+        return onPath;
+    throw new Error(`cargo install completed but ${SENTINEL_BINARY} could not be located.`);
+}
+/**
+ * Install the sentinel CLI from its GitHub release.
+ *
+ * Order: an existing binary on PATH wins; otherwise the matching release asset
+ * is downloaded and its sha256 verified against the published `.sha256` sidecar
+ * before it is extracted and added to PATH. Platforms without a prebuilt asset
+ * fall back to `cargo install --git ... --tag <version>`.
+ */
+async function installSentinelCli(version = exports.DEFAULT_SENTINEL_VERSION) {
+    const onPath = findOnPath();
+    if (onPath) {
+        core.info(`Found sentinel CLI on PATH: ${onPath}`);
+        return onPath;
+    }
+    const target = platformTarget();
+    if (!target) {
+        return installViaCargo(version);
+    }
+    const asset = `${SENTINEL_BINARY}-${version}-${target}.tar.gz`;
+    const base = `https://github.com/${SENTINEL_OWNER}/${SENTINEL_REPO}/releases/download/${version}`;
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sentinel-"));
+    const tarPath = path.join(tmp, asset);
+    const shaPath = `${tarPath}.sha256`;
+    core.info(`Downloading ${SENTINEL_BINARY} ${version} (${target}) from ${base}`);
+    download(`${base}/${asset}`, tarPath);
+    download(`${base}/${asset}.sha256`, shaPath);
+    if (!verifyChecksum(tarPath, shaPath)) {
+        throw new Error(`Checksum verification failed for ${asset}; refusing to run an unverified binary.`);
+    }
+    const stageDir = path.join(tmp, `${SENTINEL_BINARY}-${version}-${target}`);
+    (0, child_process_1.execFileSync)("tar", ["-xzf", tarPath, "-C", tmp], { stdio: "inherit" });
+    const bin = path.join(stageDir, SENTINEL_BINARY);
+    if (!fs.existsSync(bin)) {
+        throw new Error(`Expected ${bin} after extracting ${asset}, but it is missing.`);
+    }
+    fs.chmodSync(bin, 0o755);
+    core.addPath(stageDir);
+    core.info(`Installed sentinel CLI ${version} (${target}) at ${bin}`);
+    return bin;
+}
 /**
  * Locate or install the sentinel CLI.
- * If sentinelCliPath is "install", attempts to download the binary.
+ * If sentinelCliPath is "install", download + verify the release binary.
  * Otherwise treats it as a filesystem path to the binary.
  */
-async function resolveSentinelCli(sentinelCliPath) {
+async function resolveSentinelCli(sentinelCliPath, sentinelVersion = exports.DEFAULT_SENTINEL_VERSION) {
     if (sentinelCliPath === "install") {
-        return installSentinelCli();
+        return installSentinelCli(sentinelVersion);
     }
     // Validate the provided path exists
     if (!fs.existsSync(sentinelCliPath)) {
@@ -34986,41 +35125,6 @@ async function resolveSentinelCli(sentinelCliPath) {
     }
     core.info(`Using sentinel CLI at: ${sentinelCliPath}`);
     return sentinelCliPath;
-}
-/**
- * Install the sentinel CLI by attempting to fetch the latest release.
- * Falls back to checking PATH if the binary is already available.
- */
-async function installSentinelCli() {
-    // First check if it's already on PATH
-    const whichResult = (0, child_process_1.execSync)(`which ${SENTINEL_BINARY} 2>/dev/null || true`, {
-        encoding: "utf8",
-    }).trim();
-    if (whichResult && fs.existsSync(whichResult)) {
-        core.info(`Found sentinel CLI on PATH: ${whichResult}`);
-        return whichResult;
-    }
-    // Attempt to install via cargo or download from GitHub releases
-    // For now, check if cargo is available and install from source
-    const hasCargo = (0, child_process_1.execSync)("which cargo 2>/dev/null || true", {
-        encoding: "utf8",
-    }).trim();
-    if (hasCargo) {
-        core.info("Installing soroban-state-sentinel via cargo install...");
-        (0, child_process_1.execSync)(`cargo install soroban-state-sentinel 2>&1`, {
-            encoding: "utf8",
-            stdio: "inherit",
-        });
-        // After cargo install, binary is in ~/.cargo/bin/
-        const cargoBin = path.join(os.homedir(), ".cargo", "bin", SENTINEL_BINARY);
-        if (fs.existsSync(cargoBin)) {
-            core.info(`Installed sentinel CLI at: ${cargoBin}`);
-            return cargoBin;
-        }
-    }
-    throw new Error(`Failed to install ${SENTINEL_BINARY}. ` +
-        `Please provide a path via the sentinel-cli-path input, ` +
-        `or ensure cargo is available for automatic installation.`);
 }
 /**
  * Simple concurrency limiter. Returns a function that runs async work

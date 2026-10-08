@@ -5,6 +5,10 @@ inputs:
     description: 'Path to the soroban-state-sentinel binary, or "install" to fetch it'
     required: false
     default: 'install'
+  sentinel-version:
+    description: 'soroban-state-sentinel release tag to install when sentinel-cli-path is "install"'
+    required: false
+    default: 'v0.1.0'
   config-path:
     description: 'Path to the contracts.yml config file'
     required: false
