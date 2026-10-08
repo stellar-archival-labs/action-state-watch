@@ -1,5 +1,8 @@
 name: 'State Watch'
-description: 'Scheduled TTL/archival health monitor for deployed Soroban contracts'
+description: 'Monitor deployed Soroban contracts for TTL/state-archival risk on a schedule and alert via Slack, Discord, or GitHub Issues before persistent data is evicted.'
+branding:
+  icon: 'activity'
+  color: 'purple'
 inputs:
   sentinel-cli-path:
     description: 'Path to the soroban-state-sentinel binary, or "install" to fetch it'
