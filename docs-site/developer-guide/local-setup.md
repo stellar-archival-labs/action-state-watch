@@ -13,7 +13,7 @@ This guide outlines how to set up the `action-state-watch` development environme
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/Aycode01/action-state-watch.git
+git clone https://github.com/stellar-archival-labs/action-state-watch.git
 cd action-state-watch
 npm ci
 ```

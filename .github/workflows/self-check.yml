@@ -48,7 +48,7 @@ jobs:
       - name: Checkout soroban-state-sentinel
         uses: actions/checkout@v4
         with:
-          repository: Aycode01/soroban-state-sentinel
+          repository: stellar-archival-labs/soroban-state-sentinel
           path: sentinel-src
 
       - name: Setup Rust

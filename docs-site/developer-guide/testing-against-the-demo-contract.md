@@ -1,6 +1,6 @@
 # Testing Against the Demo Contract
 
-This guide demonstrates how to execute live verification scans against the real deployed testnet contract [`archival-fixtures-demo`](https://github.com/Aycode01/archival-fixtures-demo).
+This guide demonstrates how to execute live verification scans against the real deployed testnet contract [`archival-fixtures-demo`](https://github.com/stellar-archival-labs/archival-fixtures-demo).
 
 ## Demo Contract Reference
 

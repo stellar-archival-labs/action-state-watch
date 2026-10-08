@@ -35,7 +35,7 @@ You can enable one, two, or all three channels simultaneously:
 
 ```yaml
 - name: Run State Watch
-  uses: Aycode01/action-state-watch@v0.1.0
+  uses: stellar-archival-labs/action-state-watch@v0.1.0
   with:
     rpc-url: 'https://soroban-testnet.stellar.org'
     slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

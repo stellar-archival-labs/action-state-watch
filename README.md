@@ -4,7 +4,7 @@
 
 # action-state-watch
 
-[![CI](https://github.com/Aycode01/action-state-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/Aycode01/action-state-watch/actions/workflows/ci.yml)
+[![CI](https://github.com/stellar-archival-labs/action-state-watch/actions/workflows/ci.yml/badge.svg)](https://github.com/stellar-archival-labs/action-state-watch/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 📖 **[Documentation](https://soroban-state-sentinel.gitbook.io/action-state-watch/)**

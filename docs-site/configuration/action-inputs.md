@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Soroban State Watch
-        uses: Aycode01/action-state-watch@v0.1.0
+        uses: stellar-archival-labs/action-state-watch@v0.1.0
         with:
           rpc-url: 'https://soroban-testnet.stellar.org'
           config-path: 'contracts.yml'
@@ -54,7 +54,7 @@ Workflows that only want the alerts — monitoring dashboards, or verification w
 
 ```yaml
 - name: Run State Watch
-  uses: Aycode01/action-state-watch@v0.1.0
+  uses: stellar-archival-labs/action-state-watch@v0.1.0
   with:
     rpc-url: 'https://soroban-testnet.stellar.org'
     fail-on-critical: 'false'

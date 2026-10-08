@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-REPO="${GITHUB_REPOSITORY:-Aycode01/action-state-watch}"
+REPO="${GITHUB_REPOSITORY:-stellar-archival-labs/action-state-watch}"
 
 mk() {
     gh issue create --repo "$REPO" --title "$1" --body "$2"
