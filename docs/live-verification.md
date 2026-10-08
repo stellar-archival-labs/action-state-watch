@@ -136,3 +136,56 @@ Captured by running the sentinel directly against live testnet:
 This run confirms the `Healthy` path end-to-end: scan → classify → correctly suppress alerts. It does not yet confirm the `Critical`/`Archived` alert-dispatch path against real data, since the demo contract hasn't decayed that far yet as of this run.
 
 That path is covered by unit tests with mocked sentinel output (see [`run-scan.test.ts`](file:///home/gamp/stellar-archival-labs/action-state-watch/__tests__/run-scan.test.ts), [`github-issue.test.ts`](file:///home/gamp/stellar-archival-labs/action-state-watch/__tests__/github-issue.test.ts)). Once the `archival-fixtures-demo` contract reaches `Critical` or `Archived` — expected within the following days per that repo's decay timeline — trigger `self-check.yml` again and append the transcript to close this last gap.
+
+---
+
+## 4. Install-mode dogfood — 2026-10-08
+
+A second verification pass, after `sentinel-cli-path: install` replaced the
+manual sentinel checkout/build in `self-check.yml`. The action now downloads the
+published release asset and verifies its sha256 itself.
+
+Workflow Run: [Run #37747797994](https://github.com/stellar-archival-labs/action-state-watch/actions/runs/37747797994) (Self-Check, succeeded in 11s, `workflow_dispatch`)
+
+### Real Workflow Output
+
+```
+=== Soroban State Watch ===
+Config: contracts.example.yml
+RPC URL: https://soroban-testnet.stellar.org
+Loaded 1 contract(s) from config
+Downloading soroban-state-sentinel v0.1.0 (x86_64-unknown-linux-gnu) from https://github.com/stellar-archival-labs/soroban-state-sentinel/releases/download/v0.1.0
+Installed sentinel CLI v0.1.0 (x86_64-unknown-linux-gnu) at /tmp/sentinel-rFnolg/soroban-state-sentinel-v0.1.0-x86_64-unknown-linux-gnu/soroban-state-sentinel
+Sentinel CLI: /tmp/sentinel-rFnolg/soroban-state-sentinel-v0.1.0-x86_64-unknown-linux-gnu/soroban-state-sentinel
+Starting contract scans...
+Scanning CAEDHSOD3TXIAZF2BZMMNX7A2OKBCVE4WU7A6RWTHGGHWHJXHEQUMAT4 (archival-fixtures-demo rapid-expiry entry)...
+=== Scan Summary ===
+Total: 1
+Healthy: 0
+Expiring Soon: 0
+Critical: 0
+Archived: 1
+##[warning]1 contract(s) need attention!
+Commented on issue #6 for CAEDHSOD3TXIAZF2BZMMNX7A2OKBCVE4WU7A6RWTHGGHWHJXHEQUMAT4
+Findings: 0 contract(s) Critical, 1 Archived — not failing the run (fail-on-critical: false)
+=== Done ===
+```
+
+### What This Confirms
+
+- The `install` mode works end-to-end: the action downloaded
+  `soroban-state-sentinel-v0.1.0-x86_64-unknown-linux-gnu.tar.gz`, verified its
+  sha256 against the published `.sha256`, extracted it, and added it to `PATH`
+  with no manual sentinel checkout or Rust build step in the workflow.
+- The demo entry has now decayed to **Archived** (`Archived: 1`), and the
+  GitHub-Issues alert channel dispatched against it (issue #6), closing the
+  `Critical`/`Archived` gap noted in Section 3.
+- With `fail-on-critical: false` the run stays green while still reporting the
+  Archived finding — the opt-out behaves as designed.
+
+### Note on Sections 1–2
+
+The Section 1 transcript (`Found sentinel CLI on PATH: .../sentinel-src/target/release/...`,
+`Healthy: 1`) and the Section 2 local JSON (`healthy: 2`) are now historical: the
+workflow no longer builds the sentinel from source, and the contract has since
+archived. They are kept verbatim as the record of those earlier runs.
