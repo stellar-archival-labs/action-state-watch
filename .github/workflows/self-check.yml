@@ -33,34 +33,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      - name: Checkout soroban-state-sentinel
-        uses: actions/checkout@v4
-        with:
-          repository: stellar-archival-labs/soroban-state-sentinel
-          path: sentinel-src
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Build sentinel binary
-        working-directory: sentinel-src
-        run: cargo build --release --bin soroban-state-sentinel -p sentinel-cli
-
-      - name: Add sentinel binary to PATH
-        run: echo "${{ github.workspace }}/sentinel-src/target/release" >> "$GITHUB_PATH"
-
+      # Dogfood the real consumer path: the action downloads and sha256-verifies
+      # the published soroban-state-sentinel release binary itself. No manual
+      # sentinel checkout, Rust toolchain, or cargo build step is needed here.
+      #
       # The demo contract deliberately decays, so a Critical/Archived finding is
       # the expected outcome of this check, not a failure. `fail-on-critical:
       # false` keeps the action from red-ing the run while still failing the
@@ -69,6 +45,7 @@ jobs:
         uses: ./
         with:
           sentinel-cli-path: 'install'
+          sentinel-version: 'v0.1.0'
           config-path: 'contracts.example.yml'
           fail-on-critical: 'false'
           rpc-url: ${{ github.event.inputs.rpc_url || 'https://soroban-testnet.stellar.org' }}
